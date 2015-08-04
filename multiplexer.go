@@ -29,7 +29,7 @@ func (m *Multiplexer) Start() {
 		for {
 			select {
 			case batchRaw := <-m.in:
-				if err := json.Unmarshal(batchRaw, eventPayloadBatch); err != nil {
+				if err := json.Unmarshal(batchRaw, &eventPayloadBatch); err != nil {
 					log.Printf("error parsing event batch: %s", err.Error())
 				}
 				for _, payload := range eventPayloadBatch {
@@ -56,6 +56,7 @@ func (m *Multiplexer) Start() {
 	}()
 }
 
+// TODO
 func (m *Multiplexer) Stop() {}
 
 func NewMultiplexer() *Multiplexer {

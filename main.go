@@ -13,7 +13,7 @@ type EventPayload struct {
 }
 
 func main() {
-	outChans = make(map[int]chan []byte)
+	//	outChans = make(map[int]chan []byte)
 	multiplexer := NewMultiplexer()
 	multiplexer.SetPipeWorkerFactory(&pipeWorkerFactory)
 	multiplexer.Start()
@@ -29,7 +29,7 @@ func main() {
 		log.Printf("error reading standard input: %s", err.Error())
 	}
 
-	log.Println("Anemone shutting down")
+	//log.Println("Anemone shutting down")
 }
 
 func pipeWorkerFactory() {
