@@ -1,26 +1,48 @@
 package main
 
+import (
+	"encoding/json"
+	"log"
+)
+
 type Throttler struct {
-	in  <-chan []byte
-	out chan<- []byte
+	in  chan []byte
+	out chan []byte
 }
 
-func (m *Throttler) In() <-chan []byte {
-	return in
+// for now, just proxy
+func (t *Throttler) In() chan<- []byte {
+	return t.in
 }
 
-// it doesn't output anything
-func (m *Throttler) Out() chan<- []byte {
-	return out
+func (t *Throttler) Out() <-chan []byte {
+	return t.out
 }
 
-func (m *Throttler) Start() {}
+func (t *Throttler) Start() {
+	go func() {
+		var eventPayload EventPayload
+		for {
+			payload := <-t.in
+			if err := json.Unmarshal(payload, &eventPayload); err != nil {
+				log.Printf("throttler: error parsing event: %s", err.Error())
+				continue
+			}
+			if eventPayload.UserID == 0 {
+				log.Printf("throttler: error parsing event payload, couldn't get user_id: %+v", payload)
+				continue
+			}
+			//TODO throttle based on userID ...
+			t.out <- payload
+		}
+	}()
+}
 
 func (m *Throttler) Stop() {}
 
 func NewThrottler() *Throttler {
 	return &Throttler{
-		in:  make(<-chan []byte),
-		out: make(chan<- []byte),
+		in:  make(chan []byte),
+		out: make(chan []byte),
 	}
 }

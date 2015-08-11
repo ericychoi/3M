@@ -15,10 +15,10 @@ type EventPayload struct {
 func main() {
 	//	outChans = make(map[int]chan []byte)
 	multiplexer := NewMultiplexer()
-	multiplexer.SetPipeWorkerFactory(&pipeWorkerFactory)
+	multiplexer.SetPipeWorkerFactory(ThreeMWorkerFactory)
 	multiplexer.Start()
 
-	log.Println("Anemone started!!")
+	log.Println("3M started!!")
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -28,14 +28,21 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Printf("error reading standard input: %s", err.Error())
 	}
-
-	//log.Println("Anemone shutting down")
+	//log.Println("3M shutting down")
 }
 
-func pipeWorkerFactory() {
-	throttler := NewThrottler(make(chan []byte))
-	poster := NewPoster(throttler.In())
+func ThreeMWorkerFactory() Pipe {
+	link := make(chan []byte)
+	throttler := &Throttler{
+		in:  make(chan []byte),
+		out: link,
+	}
 
-	throttler.Start()
-	poster.Start()
+	poster := &Poster{
+		in:  link,
+		out: nil,
+	}
+
+	p := &Pipeline{pipes: []Pipe{throttler, poster}}
+	return p
 }
