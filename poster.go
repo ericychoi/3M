@@ -40,7 +40,7 @@ func (p *Poster) Start() {
 			}
 			//TODO post based on userID ...
 
-			url := "http://requestb.in/xbga21xb"
+			url := "http://requestb.in/r2rqcvr2"
 			req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
 			req.Header.Set("X-Custom-Header", "myvalue")
 			req.Header.Set("Content-Type", "application/json")

@@ -28,7 +28,8 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Printf("error reading standard input: %s", err.Error())
 	}
-	//log.Println("3M shutting down")
+
+	log.Println("3M shutting down")
 }
 
 func ThreeMWorkerFactory() Pipe {
