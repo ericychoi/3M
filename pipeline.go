@@ -14,11 +14,11 @@ func (p *Pipeline) Stop() {
 	//TODO
 }
 
-func (p *Pipeline) In() chan<- []byte {
+func (p *Pipeline) In() chan<- Message {
 	return p.pipes[0].In()
 }
 
 // it doesn't output anything
-func (p *Pipeline) Out() <-chan []byte {
+func (p *Pipeline) Out() <-chan Message {
 	return p.pipes[len(p.pipes)-1].Out()
 }

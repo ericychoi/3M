@@ -8,20 +8,20 @@ import (
 )
 
 type Poster struct {
-	in  chan []byte
-	out chan []byte
+	in  chan Message
+	out chan Message
 }
 
-func (p *Poster) In() chan<- []byte {
+func (p *Poster) In() chan<- Message {
 	return p.in
 }
 
-func (p *Poster) SetIn(c chan []byte) {
+func (p *Poster) SetIn(c chan Message) {
 	p.in = c
 }
 
 // it doesn't output anything
-func (p *Poster) Out() <-chan []byte {
+func (p *Poster) Out() <-chan Message {
 	return nil
 }
 
@@ -29,7 +29,9 @@ func (p *Poster) Start() {
 	go func() {
 		var eventPayload EventPayload
 		for {
-			payload := <-p.in
+			m := <-p.in
+			payload := m.Payload()
+			log.Printf("payload: %s\n", payload)
 			if err := json.Unmarshal(payload, &eventPayload); err != nil {
 				log.Printf("poster: error parsing event: %s", err.Error())
 				continue
@@ -39,8 +41,7 @@ func (p *Poster) Start() {
 				continue
 			}
 			//TODO post based on userID ...
-
-			url := "http://requestb.in/r2rqcvr2"
+			url := "http://requestb.in/1hriwb81"
 			req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
 			req.Header.Set("X-Custom-Header", "myvalue")
 			req.Header.Set("Content-Type", "application/json")
@@ -51,9 +52,9 @@ func (p *Poster) Start() {
 				log.Printf("poster: error posting event: %s", err.Error())
 				continue
 			}
-			defer resp.Body.Close()
-
-			log.Printf("response %d", resp.Status)
+			log.Printf("response %s", resp.Status)
+			resp.Body.Close()
+			m.Ack()
 		}
 	}()
 }
@@ -62,7 +63,7 @@ func (p *Poster) Stop() {}
 
 func NewPoster() *Poster {
 	return &Poster{
-		in:  make(chan []byte),
+		in:  make(chan Message),
 		out: nil,
 	}
 }

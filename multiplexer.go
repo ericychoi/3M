@@ -3,23 +3,24 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"sync"
 )
 
 type pipeWorkerFactory func() Pipe
 
 type Multiplexer struct {
-	in          chan []byte
-	out         chan []byte
+	in          chan Message
+	out         chan Message
 	pipeFactory pipeWorkerFactory
 	workerMap   map[int]Pipe
 }
 
-func (m *Multiplexer) In() chan<- []byte {
+func (m *Multiplexer) In() chan<- Message {
 	return m.in
 }
 
 // it doesn't output anything
-func (m *Multiplexer) Out() <-chan []byte {
+func (m *Multiplexer) Out() <-chan Message {
 	return nil
 }
 
@@ -61,27 +62,52 @@ func (m *Multiplexer) Start() {
 	go func() {
 		var eventPayloadBatch []EventPayload
 		for {
-			batchRaw := <-m.in
+			//batchRaw := <-m.in
+			msg := <-m.in
+			log.Printf("received: %#v\n", msg)
+
+			batchRaw := msg.Payload()
+
 			if err := json.Unmarshal(batchRaw, &eventPayloadBatch); err != nil {
 				log.Printf("error parsing event batch: %s", err.Error())
 				continue
 			}
+			log.Printf("eventPayloadBatch: %#v\n", eventPayloadBatch)
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				wg.Wait()
+				msg.Ack()
+			}()
+
 			for _, payload := range eventPayloadBatch {
 				if payload.UserID == 0 {
 					log.Printf("error parsing event payload, couldn't get user_id: %+v", payload)
 					continue
 				}
-
 				var worker Pipe
 				if m.workerMap[payload.UserID] == nil {
+					log.Printf("creating")
 					m.workerMap[payload.UserID] = m.pipeFactory()
 					m.workerMap[payload.UserID].Start()
 				}
 
 				worker = m.workerMap[payload.UserID]
+				log.Printf("about to send event payload %#v\n", payload)
 
-				worker.In() <- batchRaw
+				jsonPayload, _ := json.Marshal(&payload)
+				splitMsg := &PipeMessage{payload: jsonPayload}
+				splitMsg.SetAckHandler(func() error {
+					log.Printf("Ack called on splitMsg\n")
+					wg.Done()
+					return nil
+				})
+				wg.Add(1)
+				worker.In() <- splitMsg
+				log.Printf("sent worker msg")
 			}
+			wg.Done()
 		}
 	}()
 }
@@ -95,7 +121,8 @@ func (m *Multiplexer) SetPipeWorkerFactory(p pipeWorkerFactory) {
 
 func NewMultiplexer() *Multiplexer {
 	return &Multiplexer{
-		in:  make(chan []byte),
-		out: nil,
+		in:        make(chan Message),
+		out:       nil,
+		workerMap: make(map[int]Pipe),
 	}
 }

@@ -5,37 +5,55 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"sync"
 )
 
+// app name
+const APP = "Poster"
+
+// event payload
 type EventPayload struct {
-	UserID int `json:user_id`
-	Event  json.RawMessage
+	UserID int             `json:"user_id"`
+	Event  json.RawMessage `json:"event"`
 }
 
 func main() {
-	//	outChans = make(map[int]chan []byte)
 	multiplexer := NewMultiplexer()
-	multiplexer.SetPipeWorkerFactory(ThreeMWorkerFactory)
+	multiplexer.SetPipeWorkerFactory(WorkerFactory)
 	multiplexer.Start()
 
-	log.Println("3M started!!")
+	log.Printf("%s started\n", APP)
 
 	scanner := bufio.NewScanner(os.Stdin)
 
+	var wg sync.WaitGroup
+
 	for scanner.Scan() {
-		multiplexer.In() <- scanner.Bytes()
+		m := &PipeMessage{
+			payload: scanner.Bytes(),
+		}
+		m.SetAckHandler(func() error {
+			log.Printf("Ack called\n")
+			wg.Done()
+			return nil
+		})
+		wg.Add(1)
+
+		multiplexer.In() <- m
+		log.Printf("sent multiplex msg")
 	}
 	if err := scanner.Err(); err != nil {
 		log.Printf("error reading standard input: %s", err.Error())
 	}
 
-	log.Println("3M shutting down")
+	wg.Wait()
+	log.Printf("%s shutting down\n", APP)
 }
 
-func ThreeMWorkerFactory() Pipe {
-	link := make(chan []byte)
+func WorkerFactory() Pipe {
+	link := make(chan Message)
 	throttler := &Throttler{
-		in:  make(chan []byte),
+		in:  make(chan Message),
 		out: link,
 	}
 

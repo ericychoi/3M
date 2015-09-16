@@ -6,16 +6,16 @@ import (
 )
 
 type Throttler struct {
-	in  chan []byte
-	out chan []byte
+	in  chan Message
+	out chan Message
 }
 
 // for now, just proxy
-func (t *Throttler) In() chan<- []byte {
+func (t *Throttler) In() chan<- Message {
 	return t.in
 }
 
-func (t *Throttler) Out() <-chan []byte {
+func (t *Throttler) Out() <-chan Message {
 	return t.out
 }
 
@@ -23,7 +23,10 @@ func (t *Throttler) Start() {
 	go func() {
 		var eventPayload EventPayload
 		for {
-			payload := <-t.in
+			m := <-t.in
+			payload := m.Payload()
+			log.Printf("throttler: payload: %s\n", payload)
+
 			if err := json.Unmarshal(payload, &eventPayload); err != nil {
 				log.Printf("throttler: error parsing event: %s", err.Error())
 				continue
@@ -33,7 +36,7 @@ func (t *Throttler) Start() {
 				continue
 			}
 			//TODO throttle based on userID ...
-			t.out <- payload
+			t.out <- m
 		}
 	}()
 }
@@ -42,7 +45,7 @@ func (m *Throttler) Stop() {}
 
 func NewThrottler() *Throttler {
 	return &Throttler{
-		in:  make(chan []byte),
-		out: make(chan []byte),
+		in:  make(chan Message),
+		out: make(chan Message),
 	}
 }

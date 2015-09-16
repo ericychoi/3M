@@ -1,8 +1,8 @@
 package main
 
 type Pipe interface {
-	In() chan<- []byte
-	Out() <-chan []byte
+	In() chan<- Message
+	Out() <-chan Message
 	Start()
 	Stop()
 }
