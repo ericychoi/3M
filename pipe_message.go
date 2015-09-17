@@ -1,15 +1,17 @@
 package main
 
 type PipeMessage struct {
-	payload    []byte
-	ackHandler func() error
+	payload       []byte
+	ackHandler    func() error
+	rejectHandler func(error)
 }
 
 func (p *PipeMessage) Ack() error {
 	return p.ackHandler()
 }
 
-func (p *PipeMessage) Reject(error) {
+func (p *PipeMessage) Reject(e error) {
+	p.rejectHandler(e)
 	return
 }
 
@@ -23,4 +25,8 @@ func (p *PipeMessage) Payload() []byte {
 
 func (p *PipeMessage) SetAckHandler(f func() error) {
 	p.ackHandler = f
+}
+
+func (p *PipeMessage) SetRejectHandler(f func(error)) {
+	p.rejectHandler = f
 }

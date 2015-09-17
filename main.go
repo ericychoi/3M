@@ -20,6 +20,7 @@ type EventPayload struct {
 func main() {
 	multiplexer := NewMultiplexer()
 	multiplexer.SetPipeWorkerFactory(WorkerFactory)
+	multiplexer.SetRejectPipe(createRejectPipe())
 	multiplexer.Start()
 
 	log.Printf("%s started\n", APP)
@@ -48,6 +49,11 @@ func main() {
 
 	wg.Wait()
 	log.Printf("%s shutting down\n", APP)
+}
+
+func createRejectPipe() Pipe {
+	//TODO
+	return nil
 }
 
 func WorkerFactory() Pipe {

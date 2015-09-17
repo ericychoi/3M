@@ -48,10 +48,17 @@ func (p *Poster) Start() {
 
 			client := &http.Client{}
 			resp, err := client.Do(req)
+
 			if err != nil {
 				log.Printf("poster: error posting event: %s", err.Error())
+				m.Reject(err)
+				continue
+			} else if resp.StatusCode/100 != 200 {
+				log.Printf("poster: status code non-2xx: %d", resp.StatusCode)
+				m.Reject(err)
 				continue
 			}
+
 			log.Printf("response %s", resp.Status)
 			resp.Body.Close()
 			m.Ack()

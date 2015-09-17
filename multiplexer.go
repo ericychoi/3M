@@ -8,10 +8,14 @@ import (
 
 type pipeWorkerFactory func() Pipe
 
+// a terminal pipe (messages ends here (ack/reject)); creates PipeMessages, uses pipeFactory to
+// create multiple pipes and send the PipeMessages
+// when pipeMessage gets rejected it goes to rejectPipe
 type Multiplexer struct {
 	in          chan Message
 	out         chan Message
 	pipeFactory pipeWorkerFactory
+	rejectPipe  Pipe
 	workerMap   map[int]Pipe
 }
 
@@ -97,12 +101,21 @@ func (m *Multiplexer) Start() {
 				log.Printf("about to send event payload %#v\n", payload)
 
 				jsonPayload, _ := json.Marshal(&payload)
+
+				// create a new message (maybe factor this out to a factory?)
 				splitMsg := &PipeMessage{payload: jsonPayload}
 				splitMsg.SetAckHandler(func() error {
 					log.Printf("Ack called on splitMsg\n")
 					wg.Done()
 					return nil
 				})
+				splitMsg.SetRejectHandler(func(error) {
+					log.Printf("Reject called on splitMsg\n")
+					wg.Done()
+					m.rejectPipe.In() <- splitMsg
+					return
+				})
+
 				wg.Add(1)
 				worker.In() <- splitMsg
 				log.Printf("sent worker msg")
@@ -117,6 +130,10 @@ func (m *Multiplexer) Stop() {}
 
 func (m *Multiplexer) SetPipeWorkerFactory(p pipeWorkerFactory) {
 	m.pipeFactory = p
+}
+
+func (m *Multiplexer) SetRejectPipe(p Pipe) {
+	m.rejectPipe = p
 }
 
 func NewMultiplexer() *Multiplexer {
