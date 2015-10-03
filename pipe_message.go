@@ -6,6 +6,10 @@ type PipeMessage struct {
 	rejectHandler func(error)
 }
 
+//TODO: store metadata
+type PosterMetadata struct {
+}
+
 func (p *PipeMessage) Ack() error {
 	return p.ackHandler()
 }
@@ -21,6 +25,12 @@ func (p *PipeMessage) ID() string {
 
 func (p *PipeMessage) Payload() []byte {
 	return p.payload
+}
+
+func (p *PipeMessage) Metadata() map[string]interface{} {
+	return map[string]interface{}{
+		"poster": &PosterMetadata{},
+	}
 }
 
 func (p *PipeMessage) SetAckHandler(f func() error) {
