@@ -41,7 +41,7 @@ func (p *Poster) Start() {
 				continue
 			}
 			//TODO post based on userID ...
-			url := "http://requestb.in/1hriwb81"
+			url := "http://localhost:8000"
 			req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
 			req.Header.Set("X-Custom-Header", "myvalue")
 			req.Header.Set("Content-Type", "application/json")
@@ -53,7 +53,7 @@ func (p *Poster) Start() {
 				log.Printf("poster: error posting event: %s", err.Error())
 				m.Reject(err)
 				continue
-			} else if resp.StatusCode/100 != 200 {
+			} else if resp.StatusCode/100 != 2 {
 				log.Printf("poster: status code non-2xx: %d", resp.StatusCode)
 				m.Reject(err)
 				continue

@@ -29,7 +29,8 @@ func (m *Multiplexer) Out() <-chan Message {
 }
 
 // event batch looks like
-/*[
+/*
+[
   {
     "user_id": 180,
     "event": {
@@ -111,7 +112,6 @@ func (m *Multiplexer) Start() {
 				})
 				splitMsg.SetRejectHandler(func(error) {
 					log.Printf("Reject called on splitMsg\n")
-					wg.Done()
 					m.rejectPipe.In() <- splitMsg
 					return
 				})
@@ -134,6 +134,10 @@ func (m *Multiplexer) SetPipeWorkerFactory(p pipeWorkerFactory) {
 
 func (m *Multiplexer) SetRejectPipe(p Pipe) {
 	m.rejectPipe = p
+}
+
+func (m *Multiplexer) GetRejectPipe() Pipe {
+	return m.rejectPipe
 }
 
 func NewMultiplexer() *Multiplexer {
