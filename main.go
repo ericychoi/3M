@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"sync"
+
+	"github.com/sendgrid/ln"
 )
 
 // app name
-const APP = "Poster"
+const APP = "poster"
 
 // event payload
 type EventPayload struct {
@@ -20,6 +22,7 @@ type EventPayload struct {
 func main() {
 	multiplexer := NewMultiplexer()
 	multiplexer.SetPipeWorkerFactory(WorkerFactory)
+	multiplexer.SetRejectPipe(createRejectPipe())
 	multiplexer.Start()
 
 	log.Printf("%s started\n", APP)
@@ -28,6 +31,7 @@ func main() {
 
 	var wg sync.WaitGroup
 
+	//TODO: EOF should terminate the program
 	for scanner.Scan() {
 		m := &PipeMessage{
 			payload: scanner.Bytes(),
@@ -47,7 +51,17 @@ func main() {
 	}
 
 	wg.Wait()
+	// need to flush rejected logs because it's buffered
+	multiplexer.GetRejectPipe().Stop()
 	log.Printf("%s shutting down\n", APP)
+}
+
+func createRejectPipe() Pipe {
+	logger := ln.New("syslog", "DEBUG", "LOCAL0", APP)
+	rejecter := NewRejecter()
+	rejecter.SetLogger(logger)
+	rejecter.Start()
+	return rejecter
 }
 
 func WorkerFactory() Pipe {
