@@ -24,7 +24,6 @@ type EventPayload struct {
 
 func main() {
 	var wg sync.WaitGroup
-	var pool *redis.Pool
 
 	// configs
 	envSettings := cptplanet.Settings{Prefix: "POSTER_", ErrorOnExtraKeys: false, ErrorOnMissingKeys: true, ErrorOnParseErrors: true}
@@ -36,10 +35,11 @@ func main() {
 	}
 
 	multiplexer := NewMultiplexer()
+	multiplexer.SetRedisPool(createRedisPool(*redisServer))
 	multiplexer.SetPipeWorkerFactory(WorkerFactory)
 	multiplexer.SetRejectPipe(createRejectPipe())
 	multiplexer.Start()
-	pool = createRedisPool(*redisServer)
+
 	scanner := bufio.NewScanner(os.Stdin)
 
 	log.Printf("%s started\n", APP)

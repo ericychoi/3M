@@ -3,10 +3,12 @@ package main
 import "github.com/garyburd/redigo/redis"
 
 type PipeMessage struct {
+	id            string
 	payload       []byte
 	ackHandler    func() error
 	rejectHandler func(error)
 	metadata      map[string]string
+	redisPool     *redis.Pool
 }
 
 func (p *PipeMessage) Ack() error {
@@ -21,7 +23,7 @@ func (p *PipeMessage) Reject(e error) {
 }
 
 func (p *PipeMessage) ID() string {
-	return "id"
+	return p.id
 }
 
 func (p *PipeMessage) Payload() []byte {
@@ -46,6 +48,10 @@ func (p *PipeMessage) SetRejectHandler(f func(error)) {
 
 //TODO: make it an interface so that it can use any backend storage
 //for now, this is married to redis
-func (p *PipeMessage) SaveMetadata(f func(error)) {
-
+func (p *PipeMessage) SaveMetadata() {
+	conn := p.redisPool.Get()
+	defer conn.Close()
+	var byteMetadata []byte
+	if _, err := conn.Do("SET", "poster.message.metadata."+p.id, byteMetadata); err != nil {
+	}
 }

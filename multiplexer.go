@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+
+	"github.com/garyburd/redigo/redis"
 )
 
 type pipeWorkerFactory func() Pipe
@@ -17,6 +19,7 @@ type Multiplexer struct {
 	pipeFactory pipeWorkerFactory
 	rejectPipe  Pipe
 	workerMap   map[int]Pipe
+	redisPool   *redis.Pool
 }
 
 func (m *Multiplexer) In() chan<- Message {
@@ -104,7 +107,10 @@ func (m *Multiplexer) Start() {
 				jsonPayload, _ := json.Marshal(&payload)
 
 				// create a new message (maybe factor this out to a factory?)
-				splitMsg := &PipeMessage{payload: jsonPayload}
+				splitMsg := &PipeMessage{
+					payload:   jsonPayload,
+					redisPool: m.redisPool,
+				}
 				splitMsg.SetAckHandler(func() error {
 					log.Printf("Ack called on splitMsg\n")
 					wg.Done()
@@ -138,6 +144,10 @@ func (m *Multiplexer) SetRejectPipe(p Pipe) {
 
 func (m *Multiplexer) GetRejectPipe() Pipe {
 	return m.rejectPipe
+}
+
+func (m *Multiplexer) SetRedisPool(p *redis.Pool) {
+	m.redisPool = p
 }
 
 func NewMultiplexer() *Multiplexer {
