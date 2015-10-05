@@ -3,14 +3,16 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log"
+	"log/syslog"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/partkyle/cptplanet"
-	"github.com/sendgrid/ln"
+	//"github.com/sendgrid/ln"
 )
 
 // app name
@@ -34,6 +36,12 @@ func main() {
 		log.Fatalf("could not get required configs: %v", err)
 	}
 
+	var logger *syslog.Writer
+	logger, err = syslog.New(syslog.LOG_DEBUG|syslog.LOG_LOCAL0, APP)
+	if err != nil {
+		log.Fatalf("could not involke syslog logger: %v", err)
+	}
+
 	multiplexer := NewMultiplexer()
 	multiplexer.SetRedisPool(createRedisPool(*redisServer))
 	multiplexer.SetPipeWorkerFactory(WorkerFactory)
@@ -42,7 +50,7 @@ func main() {
 
 	scanner := bufio.NewScanner(os.Stdin)
 
-	log.Printf("%s started\n", APP)
+	logger.Info(fmt.Sprintf("%s started\n", APP))
 
 	//TODO: EOF should terminate the program
 	for scanner.Scan() {
@@ -50,29 +58,33 @@ func main() {
 			payload: scanner.Bytes(),
 		}
 		m.SetAckHandler(func() error {
-			log.Printf("Ack called\n")
+			logger.Debug("Ack called\n")
 			wg.Done()
 			return nil
 		})
 		wg.Add(1)
 
 		multiplexer.In() <- m
-		log.Printf("sent multiplex msg")
+		logger.Debug("sent multiplex msg")
 	}
 	if err := scanner.Err(); err != nil {
-		log.Printf("error reading standard input: %s", err.Error())
+		logger.Err(fmt.Sprintf("error reading standard input: %s", err.Error()))
 	}
 
 	wg.Wait()
 	// need to flush rejected logs because it's buffered
 	multiplexer.GetRejectPipe().Stop()
-	log.Printf("%s shutting down\n", APP)
+	logger.Err(fmt.Sprintf("%s shutting down\n", APP))
 }
 
 func createRejectPipe() Pipe {
-	logger := ln.New("syslog", "DEBUG", "LOCAL1", APP)
+	rejectLogger, err := syslog.New(syslog.LOG_DEBUG|syslog.LOG_LOCAL1, APP)
+	if err != nil {
+		log.Fatalf("could not involke syslog logger: %v", err)
+	}
+	//logger := ln.New("syslog", "DEBUG", "LOCAL1", APP)
 	rejecter := NewRejecter()
-	rejecter.SetLogger(logger)
+	rejecter.SetLogger(rejectLogger)
 	rejecter.Start()
 	return rejecter
 }
