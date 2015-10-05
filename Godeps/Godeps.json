@@ -1,0 +1,23 @@
+{
+	"ImportPath": "github.com/ericychoi/poster",
+	"GoVersion": "go1.5.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/garyburd/redigo/internal",
+			"Rev": "764a32c188f6ce0bc2565349f0125b3ad4021ea9"
+		},
+		{
+			"ImportPath": "github.com/garyburd/redigo/redis",
+			"Rev": "764a32c188f6ce0bc2565349f0125b3ad4021ea9"
+		},
+		{
+			"ImportPath": "github.com/partkyle/cptplanet",
+			"Rev": "199ffaba010e7210bcc68214b9752269e1c0063a"
+		},
+		{
+			"ImportPath": "github.com/sendgrid/ln",
+			"Comment": "v1.3.2-64-g888d148",
+			"Rev": "888d148dd2b72af66203744ab755d6975894208c"
+		}
+	]
+}

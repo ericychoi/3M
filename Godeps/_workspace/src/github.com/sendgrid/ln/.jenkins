@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -ex
+
+docker run \
+	--volume="$PWD:/opt/go/src/github.com/sendgrid/ln" \
+	--env="GOPATH=/opt/go/src/github.com/sendgrid/ln/Godeps/_workspace:/opt/go" \
+	--workdir=/opt/go/src/github.com/sendgrid/ln \
+	docker.sendgrid.net/sendgrid/dev_go go vet ./...
+
+docker run \
+	--volume="$PWD:/opt/go/src/github.com/sendgrid/ln" \
+	--env="GOPATH=/opt/go/src/github.com/sendgrid/ln/Godeps/_workspace:/opt/go" \
+	--workdir=/opt/go/src/github.com/sendgrid/ln \
+	docker.sendgrid.net/sendgrid/dev_go go test -race -timeout=1m .
+
+docker run \
+	--volume="$PWD:/opt/go/src/github.com/sendgrid/ln" \
+	--env="GOPATH=/opt/go/src/github.com/sendgrid/ln/Godeps/_workspace:/opt/go" \
+	--workdir=/opt/go/src/github.com/sendgrid/ln \
+	docker.sendgrid.net/sendgrid/dev_go go run benchmark/main.go -count=500000 | grep -v hello
