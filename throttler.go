@@ -5,6 +5,8 @@ import (
 	"log"
 )
 
+const THROTTLER_DELAY = `throttler_delay`
+
 type Throttler struct {
 	in  chan Message
 	out chan Message
@@ -26,6 +28,9 @@ func (t *Throttler) Start() {
 			m := <-t.in
 			payload := m.Payload()
 			log.Printf("throttler: payload: %s\n", payload)
+
+			metadata := m.Metadata()
+			log.Printf("throttler: metadata: %+v\n", metadata)
 
 			if err := json.Unmarshal(payload, &eventPayload); err != nil {
 				log.Printf("throttler: error parsing event: %s", err.Error())

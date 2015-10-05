@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type Poster struct {
@@ -51,10 +52,12 @@ func (p *Poster) Start() {
 
 			if err != nil {
 				log.Printf("poster: error posting event: %s", err.Error())
+				throttleMessage(m)
 				m.Reject(err)
 				continue
 			} else if resp.StatusCode/100 != 2 {
 				log.Printf("poster: status code non-2xx: %d", resp.StatusCode)
+				throttleMessage(m)
 				m.Reject(err)
 				continue
 			}
@@ -67,6 +70,21 @@ func (p *Poster) Start() {
 }
 
 func (p *Poster) Stop() {}
+
+// write to messsage's metadata that this needs to be throttled
+func throttleMessage(m Message) {
+	metadata := m.Metadata()
+	currentDelay, err := strconv.Atoi(metadata[THROTTLER_DELAY])
+	if err != nil {
+		log.Printf(
+			"poster: could not get throttler_next_attempt from metadata. got %s", metadata[THROTTLER_DELAY],
+		)
+		currentDelay = 0
+	}
+	nextDelay := currentDelay * 2
+	log.Printf("poster: setting next delay to %d", nextDelay)
+	metadata[THROTTLER_DELAY] = strconv.Itoa(nextDelay)
+}
 
 func NewPoster() *Poster {
 	return &Poster{

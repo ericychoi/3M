@@ -6,7 +6,10 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
+	"github.com/garyburd/redigo/redis"
+	"github.com/partkyle/cptplanet"
 	"github.com/sendgrid/ln"
 )
 
@@ -20,16 +23,26 @@ type EventPayload struct {
 }
 
 func main() {
+	var wg sync.WaitGroup
+	var pool *redis.Pool
+
+	// configs
+	envSettings := cptplanet.Settings{Prefix: "POSTER_", ErrorOnExtraKeys: false, ErrorOnMissingKeys: true, ErrorOnParseErrors: true}
+	env := cptplanet.NewEnvironment(envSettings)
+	redisServer := env.String("REDIS_SERVER", "127.0.0.1:6379", "host to bind")
+	err := env.Parse()
+	if err != nil {
+		log.Fatalf("could not get required configs: %v", err)
+	}
+
 	multiplexer := NewMultiplexer()
 	multiplexer.SetPipeWorkerFactory(WorkerFactory)
 	multiplexer.SetRejectPipe(createRejectPipe())
 	multiplexer.Start()
-
-	log.Printf("%s started\n", APP)
-
+	pool = createRedisPool(*redisServer)
 	scanner := bufio.NewScanner(os.Stdin)
 
-	var wg sync.WaitGroup
+	log.Printf("%s started\n", APP)
 
 	//TODO: EOF should terminate the program
 	for scanner.Scan() {
@@ -57,7 +70,7 @@ func main() {
 }
 
 func createRejectPipe() Pipe {
-	logger := ln.New("syslog", "DEBUG", "LOCAL0", APP)
+	logger := ln.New("syslog", "DEBUG", "LOCAL1", APP)
 	rejecter := NewRejecter()
 	rejecter.SetLogger(logger)
 	rejecter.Start()
@@ -78,4 +91,22 @@ func WorkerFactory() Pipe {
 
 	p := &Pipeline{pipes: []Pipe{throttler, poster}}
 	return p
+}
+
+func createRedisPool(server string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", server)
+			if err != nil {
+				return nil, err
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
 }
