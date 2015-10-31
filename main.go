@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/partkyle/cptplanet"
-	//"github.com/sendgrid/ln"
+	//"github.com/partkyle/cptplanet"
 )
 
 // app name
@@ -24,33 +23,34 @@ type EventPayload struct {
 	Event  json.RawMessage `json:"event"`
 }
 
+var Logger *log.Logger
+
 func main() {
 	var wg sync.WaitGroup
 
+	Logger = log.New(os.Stdout, "", log.LstdFlags)
+	Logger.Printf(fmt.Sprintf("%s started\n", APP))
+
 	// configs
-	envSettings := cptplanet.Settings{Prefix: "POSTER_", ErrorOnExtraKeys: false, ErrorOnMissingKeys: true, ErrorOnParseErrors: true}
-	env := cptplanet.NewEnvironment(envSettings)
-	redisServer := env.String("REDIS_SERVER", "127.0.0.1:6379", "host to bind")
-	err := env.Parse()
-	if err != nil {
-		log.Fatalf("could not get required configs: %v", err)
-	}
+	//envSettings := cptplanet.Settings{Prefix: "POSTER_", ErrorOnExtraKeys: false, ErrorOnMissingKeys: true, ErrorOnParseErrors: true}
+	//env := cptplanet.NewEnvironment(envSettings)
+	//redisServer := env.String("REDIS_SERVER", "127.0.0.1:6379", "host to bind")
+	redisServer1 := `127.0.0.1:6379`
+	//err := env.Parse()
+	//if err != nil {
+	//	log.Fatalf("could not get required configs: %v", err)
+	//}
 
-	var logger *syslog.Writer
-	logger, err = syslog.New(syslog.LOG_DEBUG|syslog.LOG_LOCAL0, APP)
-	if err != nil {
-		log.Fatalf("could not involke syslog logger: %v", err)
-	}
-
+	pool := createRedisPool(redisServer1)
 	multiplexer := NewMultiplexer()
-	multiplexer.SetRedisPool(createRedisPool(*redisServer))
+	multiplexer.SetRedisPool(pool)
 	multiplexer.SetPipeWorkerFactory(WorkerFactory)
 	multiplexer.SetRejectPipe(createRejectPipe())
 	multiplexer.Start()
 
-	scanner := bufio.NewScanner(os.Stdin)
+	Logger.Printf(fmt.Sprintf("%s redis\n", redisServer1))
 
-	logger.Info(fmt.Sprintf("%s started\n", APP))
+	scanner := bufio.NewScanner(os.Stdin)
 
 	//TODO: EOF should terminate the program
 	for scanner.Scan() {
@@ -58,23 +58,23 @@ func main() {
 			payload: scanner.Bytes(),
 		}
 		m.SetAckHandler(func() error {
-			logger.Debug("Ack called\n")
+			Logger.Printf("Ack called\n")
 			wg.Done()
 			return nil
 		})
 		wg.Add(1)
 
 		multiplexer.In() <- m
-		logger.Debug("sent multiplex msg")
+		Logger.Println("sent multiplex msg")
 	}
 	if err := scanner.Err(); err != nil {
-		logger.Err(fmt.Sprintf("error reading standard input: %s", err.Error()))
+		Logger.Println(fmt.Sprintf("error reading standard input: %s", err.Error()))
 	}
 
 	wg.Wait()
 	// need to flush rejected logs because it's buffered
 	multiplexer.GetRejectPipe().Stop()
-	logger.Err(fmt.Sprintf("%s shutting down\n", APP))
+	Logger.Printf(fmt.Sprintf("%s shutting down\n", APP))
 }
 
 func createRejectPipe() Pipe {
@@ -82,7 +82,6 @@ func createRejectPipe() Pipe {
 	if err != nil {
 		log.Fatalf("could not involke syslog logger: %v", err)
 	}
-	//logger := ln.New("syslog", "DEBUG", "LOCAL1", APP)
 	rejecter := NewRejecter()
 	rejecter.SetLogger(rejectLogger)
 	rejecter.Start()
@@ -112,6 +111,7 @@ func createRedisPool(server string) *redis.Pool {
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", server)
 			if err != nil {
+				fmt.Printf("redis error: %s\n", err.Error())
 				return nil, err
 			}
 			return c, err

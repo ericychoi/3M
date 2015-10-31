@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 )
@@ -32,13 +31,13 @@ func (p *Poster) Start() {
 		for {
 			m := <-p.in
 			payload := m.Payload()
-			log.Printf("payload: %s\n", payload)
+			Logger.Printf("payload: %s\n", payload)
 			if err := json.Unmarshal(payload, &eventPayload); err != nil {
-				log.Printf("poster: error parsing event: %s", err.Error())
+				Logger.Printf("poster: error parsing event: %s", err.Error())
 				continue
 			}
 			if eventPayload.UserID == 0 {
-				log.Printf("poster: error parsing event payload, couldn't get user_id: %+v", payload)
+				Logger.Printf("poster: error parsing event payload, couldn't get user_id: %+v", payload)
 				continue
 			}
 			//TODO post based on userID ...
@@ -51,18 +50,18 @@ func (p *Poster) Start() {
 			resp, err := client.Do(req)
 
 			if err != nil {
-				log.Printf("poster: error posting event: %s", err.Error())
+				Logger.Printf("poster: error posting event: %s", err.Error())
 				throttleMessage(m)
 				m.Reject(err)
 				continue
 			} else if resp.StatusCode/100 != 2 {
-				log.Printf("poster: status code non-2xx: %d", resp.StatusCode)
+				Logger.Printf("poster: status code non-2xx: %d", resp.StatusCode)
 				throttleMessage(m)
 				m.Reject(err)
 				continue
 			}
 
-			log.Printf("response %s", resp.Status)
+			Logger.Printf("response %s", resp.Status)
 			resp.Body.Close()
 			m.Ack()
 		}
@@ -76,13 +75,13 @@ func throttleMessage(m Message) {
 	metadata := m.Metadata()
 	currentDelay, err := strconv.Atoi(metadata[THROTTLER_DELAY])
 	if err != nil {
-		log.Printf(
+		Logger.Printf(
 			"poster: could not get throttler_next_attempt from metadata. got %s", metadata[THROTTLER_DELAY],
 		)
-		currentDelay = 0
+		currentDelay = 1
 	}
 	nextDelay := currentDelay * 2
-	log.Printf("poster: setting next delay to %d", nextDelay)
+	Logger.Printf("poster: setting next delay to %d", nextDelay)
 	metadata[THROTTLER_DELAY] = strconv.Itoa(nextDelay)
 }
 

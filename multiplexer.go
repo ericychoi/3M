@@ -31,10 +31,9 @@ func (m *Multiplexer) Out() <-chan Message {
 	return nil
 }
 
-// event batch looks like
+// event looks like
 /*
-[
-  {
+{
     "user_id": 180,
     "event": {
       "sg_event_id": "LhVSEIH-RyqLovf1-i1xLA",
@@ -48,85 +47,66 @@ func (m *Multiplexer) Out() <-chan Message {
         "appid": 1
       }
     }
-  },
-  {
-    "user_id": 180,
-    "event": {
-      "sg_event_id": "m-ToYAJ8TpazjKIEdunpKA",
-      "sg_message_id": "core-development-build.22201.54FDEC3F1.0",
-      "abcd": "800",
-      "event": "processed",
-      "email": "eric.choi099@sendgrid.com",
-      "smtp-id": "<1425927232.1513133910567075@core-development-build>",
-      "timestamp": 1425927232,
-      "_sg_data_": {
-        "appid": 1
-      }
-    }
-  }
-]
+}
 */
 func (m *Multiplexer) Start() {
 	go func() {
-		var eventPayloadBatch []EventPayload
+		var payload EventPayload
 		for {
-			//batchRaw := <-m.in
 			msg := <-m.in
 			log.Printf("received: %#v\n", msg)
 
 			batchRaw := msg.Payload()
 
-			if err := json.Unmarshal(batchRaw, &eventPayloadBatch); err != nil {
-				log.Printf("error parsing event batch: %s", err.Error())
+			if err := json.Unmarshal(batchRaw, &payload); err != nil {
+				log.Printf("error parsing event batch: %s, %s", err.Error(), batchRaw)
 				continue
 			}
-			log.Printf("eventPayloadBatch: %#v\n", eventPayloadBatch)
+			log.Printf("eventPayloadBatch: %#v\n", payload)
 
 			var wg sync.WaitGroup
-			wg.Add(1)
 			go func() {
 				wg.Wait()
 				msg.Ack()
 			}()
 
-			for _, payload := range eventPayloadBatch {
-				if payload.UserID == 0 {
-					log.Printf("error parsing event payload, couldn't get user_id: %+v", payload)
-					continue
-				}
-				var worker Pipe
-				if m.workerMap[payload.UserID] == nil {
-					log.Printf("creating")
-					m.workerMap[payload.UserID] = m.pipeFactory()
-					m.workerMap[payload.UserID].Start()
-				}
-
-				worker = m.workerMap[payload.UserID]
-				log.Printf("about to send event payload %#v\n", payload)
-
-				jsonPayload, _ := json.Marshal(&payload)
-
-				// create a new message (maybe factor this out to a factory?)
-				splitMsg := &PipeMessage{
-					payload:   jsonPayload,
-					redisPool: m.redisPool,
-				}
-				splitMsg.SetAckHandler(func() error {
-					log.Printf("Ack called on splitMsg\n")
-					wg.Done()
-					return nil
-				})
-				splitMsg.SetRejectHandler(func(error) {
-					log.Printf("Reject called on splitMsg\n")
-					m.rejectPipe.In() <- splitMsg
-					return
-				})
-
-				wg.Add(1)
-				worker.In() <- splitMsg
-				log.Printf("sent worker msg")
+			if payload.UserID == 0 {
+				log.Printf("error parsing event payload, couldn't get user_id: %+v", payload)
+				continue
 			}
-			wg.Done()
+			var worker Pipe
+			if m.workerMap[payload.UserID] == nil {
+				log.Printf("creating")
+				m.workerMap[payload.UserID] = m.pipeFactory()
+				m.workerMap[payload.UserID].Start()
+			}
+
+			worker = m.workerMap[payload.UserID]
+			log.Printf("about to send event payload %#v\n", payload)
+
+			jsonPayload, _ := json.Marshal(&payload)
+
+			// create a new message (maybe factor this out to a factory?)
+			splitMsg := &PipeMessage{
+				payload:   jsonPayload,
+				redisPool: m.redisPool,
+			}
+			splitMsg.SetAckHandler(func() error {
+				log.Printf("Ack called on splitMsg\n")
+				splitMsg.SaveMetadata()
+				wg.Done()
+				return nil
+			})
+			splitMsg.SetRejectHandler(func(error) {
+				log.Printf("Reject called on splitMsg\n")
+				splitMsg.SaveMetadata()
+				m.rejectPipe.In() <- splitMsg
+				return
+			})
+
+			wg.Add(1)
+			worker.In() <- splitMsg
+			log.Printf("sent worker msg")
 		}
 	}()
 }

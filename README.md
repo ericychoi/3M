@@ -1,11 +1,17 @@
 # Poster
-It posts events.
-
-# config for rsyslog
-module(load="omprog")
-        local0.* action(type="omprog" binary="/opt/sendgrid/prism/current/prism -config_path=/etc/sendgrid/prism.properties" output="/var/log/sendgrid/prism.log" hup.signal="TERM" queue.spoolDirectory="/var/spool/rsyslog" queue.filename="prism_kafka_queue" queue.type="Disk" queue.maxdiskspace="1G")
+Poster is an Rsyslog Omprog module that will take json array from stdout and posts it into user's end point.
 
 http://www.rsyslog.com/doc/v8-stable/configuration/modules/omprog.html
 
-# Bring Up http sink
+# bring Up http sink
 $ sink http
+
+# install
+$ sudo mkdir -p /var/spool/poster
+$ bin/deploy
+
+# logs
+Poster will output logs to STDOUT, in the provided rsyslog config, we instruct rsyslog to put the logs to /tmp/poster.log
+
+# how to run
+$ godep go build -o build/poster && echo '[{"user_id":12345,"event":"click","sg_event":"foo"}]' | build/poster
